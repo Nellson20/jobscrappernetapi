@@ -1,53 +1,90 @@
-﻿using System.Text.Json;
+﻿using System.Net.Http;
 using HtmlAgilityPack;
 using JobFinder.Api.Domain;
+using JobFinder.Api.Interfaces;
 
 namespace JobFinder.Api.Services;
 
 public class JobScrapperService : IJobScrapperService
 {
-    public IEnumerable<Job> ScrapeJobs(string? keyword = null)
+
+    private string GetFullUrl(string href, string siteHost)
+    {
+        if (string.IsNullOrWhiteSpace(href))
+            return siteHost;
+
+        href = href.Trim();
+
+        // Si l'URL est déjà absolue
+        if (href.StartsWith("http://") || href.StartsWith("https://"))
+            return href;
+
+        // Si le siteHost n'a pas de slash final, on l'ajoute
+        if (!siteHost.EndsWith("/"))
+            siteHost += "/";
+
+        // Si href commence par /, on l'enlève pour éviter "//"
+        if (href.StartsWith("/"))
+            href = href.Substring(1);
+
+        return siteHost + href;
+    }
+
+    public IEnumerable<Job> ScrapeJobs(ISearchUrlBuilder urlBuilder, 
+                                   Dictionary<string, string>? queryParams,
+                                   SiteHtmlMapping mapping)
     {
         var jobs = new List<Job>();
 
+        var url = urlBuilder.Build(queryParams);
+
+        var host = (urlBuilder as dynamic)?.Host ?? "";
+
         var web = new HtmlWeb();
-        var url = "https://weworkremotely.com/categories/remote-programming-jobs";
         var doc = web.Load(url);
 
-        // Chaque job est dans li class="feature" ou li class=""
-        foreach (var node in doc.DocumentNode.SelectNodes("//section[@class='jobs']//li") ?? Enumerable.Empty<HtmlNode>())
+        foreach (var node in doc.DocumentNode.SelectNodes(mapping.JobNodeSelector) 
+                                    ?? Enumerable.Empty<HtmlNode>())
         {
-            var titleNode = node.SelectSingleNode(".//h3[@class='new-listing__header__title']");
-            var companyNode = node.SelectSingleNode(".//p[@class='new-listing__company-name']");
-            var linkNode = node.SelectSingleNode(".//a[@class='listing-link--unlocked']");
+            var titleNode = node.SelectSingleNode(mapping.TitleSelector);
+            var companyNode = node.SelectSingleNode(mapping.CompanySelector);
+            var linkNode = node.SelectSingleNode(mapping.LinkSelector);
+            var PublishedAtNode = node.SelectSingleNode(mapping.PublishedAtSelector);
 
-            if (titleNode == null || companyNode == null || linkNode == null) continue;
+            var contracts = new List<string>();
+            
+            foreach (var contractNode in doc.DocumentNode.SelectNodes(mapping.ContractSelector))
+            {
+                contracts.Add(contractNode.InnerText.Trim());
+            }
 
-            var title = titleNode.InnerText.Trim() ?? "n/a";
-            var company = companyNode.InnerText.Trim() ?? "n/a";
-            var jobUrl = "https://weworkremotely.com" + linkNode.GetAttributeValue("href", "#");
+            if (titleNode == null || companyNode == null || linkNode == null)
+                continue;
+
+            var title = titleNode.InnerText.Trim();
+            var company = companyNode.InnerText.Trim();
+            var jobUrl = GetFullUrl(linkNode.GetAttributeValue("href", "#"), host);
+
+            var location = !string.IsNullOrWhiteSpace(mapping.LocationSelector)
+                ? node.SelectSingleNode(mapping.LocationSelector)?.InnerText.Trim() ?? "Remote"
+                : "Remote";
+
+            var publishedAt = PublishedAtNode?.InnerText.Trim() ?? "";
+
 
             jobs.Add(new Job
             {
                 Title = title,
                 Company = company,
-                Location = "Remote",
-                ContractType = "Remote",
-                TechStack = new List<string>(),
-                Source = "WeWorkRemotely",
                 Url = jobUrl,
-                PublishedAt = DateTime.UtcNow
+                Location = location,
+                ContractTypes = contracts,
+                Source = host,
+                TechStack = new List<string>(),
+                PublishedAt = publishedAt
             });
         }
 
-        // Filtrage keyword
-        if (!string.IsNullOrEmpty(keyword))
-        {
-            jobs = jobs.Where(j => j.Title.Contains(keyword, StringComparison.OrdinalIgnoreCase) ||
-                                   j.Company.Contains(keyword, StringComparison.OrdinalIgnoreCase)).ToList();
-        }
-
         return jobs;
-
     }
 }

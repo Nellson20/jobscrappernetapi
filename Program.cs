@@ -1,4 +1,5 @@
 using JobFinder.Api.Services;
+using JobFinder.Api.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,7 +9,10 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<IJobService, JobService>();
+// ✅ Injection de JobScrapperService avec HttpClient
 builder.Services.AddScoped<IJobScrapperService, JobScrapperService>();
+
+
 
 var app = builder.Build();
 

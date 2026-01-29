@@ -25,10 +25,11 @@ public class JobsController : ControllerBase
                 Title = j.Title,
                 Company = j.Company,
                 Location = j.Location,
-                ContractType = j.ContractType,
+                ContractTypes = j.ContractTypes,
                 TechStack = j.TechStack,
                 Url = j.Url,
-                Source = j.Source
+                Source = j.Source,
+                PublishedAt = j.PublishedAt,
             });
 
         return Ok(jobs);
