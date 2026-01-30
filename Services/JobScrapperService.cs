@@ -53,9 +53,14 @@ public class JobScrapperService : IJobScrapperService
 
             var contracts = new List<string>();
             
-            foreach (var contractNode in doc.DocumentNode.SelectNodes(mapping.ContractSelector))
+            var contractNodes = node.SelectNodes(mapping.ContractSelector);
+
+            if (contractNodes != null)
             {
-                contracts.Add(contractNode.InnerText.Trim());
+                foreach (var contractNode in contractNodes)
+                {
+                    contracts.Add(contractNode.InnerText.Trim());
+                }
             }
 
             if (titleNode == null || companyNode == null || linkNode == null)
