@@ -1,5 +1,8 @@
 using JobFinder.Api.Services;
+// using JobFinder.Api.Repositories;
 using JobFinder.Api.Interfaces;
+using Microsoft.EntityFrameworkCore;
+using JobFinder.Api.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +14,13 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<IJobService, JobService>();
 // ✅ Injection de JobScrapperService avec HttpClient
 builder.Services.AddScoped<IJobScrapperService, JobScrapperService>();
+builder.Services.AddScoped<JobRepository>();
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection")
+    )
+);
 
 
 

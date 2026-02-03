@@ -19,7 +19,8 @@ public class JobsController : ControllerBase
     [HttpGet]
     public IActionResult Get([FromQuery] string? keyword)
     {
-        var jobs = _jobService.Search(keyword)
+        var jobs = _jobService.SearchAndSaveJobAsync(keyword)
+            .Result
             .Select(j => new JobDto
             {
                 Title = j.Title,

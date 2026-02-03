@@ -8,12 +8,15 @@ public class JobService : IJobService
 {
     private readonly IJobScrapperService _scrapperService;
 
-    public JobService(IJobScrapperService scrapperService)
+    private readonly JobRepository _jobRepository;
+
+    public JobService(IJobScrapperService scrapperService, JobRepository jobRepository)
     {
         _scrapperService = scrapperService;
+        _jobRepository = jobRepository;
     }
 
-    public IEnumerable<Job> Search(string keyword, string location = "Remote", string contract = "Remote")
+    public async Task<IEnumerable<Job>> SearchAndSaveJobAsync(string keyword, string location = "Remote", string contract = "Remote")
     {
         var weWorkBuilderParams = new Dictionary<string, string>
         {
@@ -34,21 +37,33 @@ public class JobService : IJobService
             PublishedAtSelector = ".//p[@class='new-listing__header__icons__date']" // optionnel
         };
 
-        // 2️⃣ Ajouter éventuellement des mocks internes
-        // On peut scraper plusieurs sites et concaténer les résultats
         var allJobs = new List<Job>();
 
         // Exemple site 1
         var weWorkBuilder = new QueryParamSearchUrlBuilder("https://weworkremotely.com/remote-jobs/search");
         allJobs.AddRange(_scrapperService.ScrapeJobs(weWorkBuilder, weWorkBuilderParams, weWorkMapping));
 
+        var scrapedUrls = allJobs.Select(j => j.Url).ToList();
+
+        var existingUrls = await _jobRepository.FilterExistingJobsAsync(scrapedUrls);
+
+
+        var newJobs = allJobs
+        .Where(j => !existingUrls.Contains(j.Url))
+        .ToList();
+        
+        if (newJobs.Any())
+        {
+            await _jobRepository.AddAllJobAsync(newJobs);
+        }
+
+        return newJobs;
         // // Exemple site 2
         // var remoteOkBuilder = new QueryParamSearchUrlBuilder("https://remoteok.com/remote-dev-jobs");
         // allJobs.AddRange(_scrapperService.ScrapeJobs(remoteOkBuilder, queryParams));
 
         // Ici tu pourrais trier, filtrer, enlever les doublons, etc.
         // .OrderByDescending(j => j.PublishedAt)
-        return allJobs;
 
     }
 }
